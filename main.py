@@ -8,7 +8,7 @@ import asyncio
 import os
 
 BOT_TOKEN = os.getenv("BOT_TOKEN") or "7863135976:AAGlQmvWoPPqKtb9kn6WjgiL96AG0a8EFkw"
-ADMIN_IDS = {123456789}  # Заменить на реальные Telegram ID админов
+ADMIN_IDS = {5361974069} 
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
