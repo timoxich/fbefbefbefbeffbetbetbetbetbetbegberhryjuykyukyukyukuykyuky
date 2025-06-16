@@ -79,11 +79,12 @@ def reset(data: KeyModel):
     reset_key_hwid(data.key)
     return {"success": True}
 
-@app.get("/generate_key")
+@app.api_route("/generate_key", methods=["GET", "POST"])
 def generate_key_endpoint():
     key = generate_key()
     insert_key(key)
     return {"success": True, "key": key}
+
 
 @app.get("/ZJEfYIMk_activate_key")
 def activate_key(code: str = Query(...), hwid: str = Query(...)):
