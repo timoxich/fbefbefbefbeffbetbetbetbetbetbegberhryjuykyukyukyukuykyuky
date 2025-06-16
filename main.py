@@ -2,19 +2,26 @@ import os
 import asyncio
 import aiohttp
 from aiogram import Bot, Dispatcher, F
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, StateFilter
+from aiogram.fsm.state import StatesGroup, State
+from aiogram.fsm.context import FSMContext
 from aiogram.enums import ParseMode
-from aiogram.types import InlineKeyboardButton
+from aiogram.types import Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardButton, CallbackQuery
+from aiogram.fsm.storage.memory import MemoryStorage
 
 BOT_TOKEN = os.getenv("BOT_TOKEN") or "7863135976:AAGlQmvWoPPqKtb9kn6WjgiL96AG0a8EFkw"
 API_BASE = "https://elevenx.onrender.com"
 
 ADMIN_IDS = {7899575088, 5361974069}
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
+dp = Dispatcher(storage=MemoryStorage())
 UID_COUNTER = {}
 PAID_USERS = set()
+
+class KeyInput(StatesGroup):
+    waiting_for_key = State()
 
 async def main_menu_keyboard(is_admin=False):
     kb = InlineKeyboardBuilder()
@@ -25,8 +32,11 @@ async def main_menu_keyboard(is_admin=False):
         kb.button(text="⚙️ Админ панель", callback_data="admin_panel")
     return kb.as_markup()
 
-async def back_button():
+async def back_button(extra_buttons: list[InlineKeyboardButton] = None):
     kb = InlineKeyboardBuilder()
+    if extra_buttons:
+        for btn in extra_buttons:
+            kb.row(btn)
     kb.button(text="⬅️ Назад", callback_data="back")
     return kb.as_markup()
 
@@ -54,7 +64,7 @@ async def start(msg):
     await msg.answer("👋 Добро пожаловать в бота eLevenX Shop!", reply_markup=keyboard)
 
 @dp.callback_query(F.data == "about")
-async def about(call):
+async def about(call: CallbackQuery):
     kb = await back_button()
     await call.message.edit_text(
         "✨ О магазине\n\n"
@@ -69,7 +79,7 @@ async def about(call):
     await call.answer()
 
 @dp.callback_query(F.data == "profile")
-async def profile(call):
+async def profile(call: CallbackQuery):
     uid = UID_COUNTER.get(call.from_user.id)
     if uid is None:
         uid = len(UID_COUNTER) + 1
@@ -87,7 +97,7 @@ async def profile(call):
     await call.answer()
 
 @dp.callback_query(F.data == "subscription")
-async def subscription(call):
+async def subscription(call: CallbackQuery):
     user_id = call.from_user.id
     async with aiohttp.ClientSession() as session:
         async with session.get(
@@ -95,7 +105,8 @@ async def subscription(call):
             params={"key": f"UID_{user_id}"}
         ) as resp:
             data = await resp.json()
-    kb = await back_button()
+    extra = [InlineKeyboardButton(text="🔓 Активировать ключ", callback_data="activate_key")]
+    kb = await back_button(extra_buttons=extra)
     if not data.get("found", False):
         if user_id in PAID_USERS:
             PAID_USERS.discard(user_id)
@@ -111,8 +122,28 @@ async def subscription(call):
         )
     await call.answer()
 
+@dp.callback_query(F.data == "activate_key")
+async def ask_key(call: CallbackQuery, state: FSMContext):
+    await state.set_state(KeyInput.waiting_for_key)
+    await call.message.edit_text("🔐 Введите ключ, который вы хотите активировать:")
+    await call.answer()
+
+@dp.message(StateFilter(KeyInput.waiting_for_key))
+async def process_key_input(msg: Message, state: FSMContext):
+    key = msg.text.strip()
+    hwid = f"UID_{msg.from_user.id}"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"{API_BASE}/TKVYLeXu_check", params={"key": key, "hwid": hwid}) as resp:
+            res = await resp.json()
+    await state.clear()
+    if res.get("valid"):
+        PAID_USERS.add(msg.from_user.id)
+        await msg.answer("✅ Ключ успешно активирован и привязан к вашему Telegram!")
+    else:
+        await msg.answer("❌ Неверный или уже использованный ключ.")
+
 @dp.callback_query(F.data == "admin_panel")
-async def admin_panel(call):
+async def admin_panel(call: CallbackQuery):
     if call.from_user.id not in ADMIN_IDS:
         await call.answer("Доступ запрещён", show_alert=True)
         return
@@ -123,7 +154,7 @@ async def admin_panel(call):
     await call.answer()
 
 @dp.callback_query(F.data == "create_key")
-async def create_key_start(call):
+async def create_key_start(call: CallbackQuery):
     if call.from_user.id not in ADMIN_IDS:
         await call.answer("Доступ запрещён", show_alert=True)
         return
@@ -138,7 +169,7 @@ async def create_key_start(call):
     await call.answer()
 
 @dp.callback_query(F.data == "back")
-async def back(call):
+async def back(call: CallbackQuery):
     is_admin = call.from_user.id in ADMIN_IDS
     keyboard = await main_menu_keyboard(is_admin)
     await call.message.edit_text("👋 Добро пожаловать в бота eLevenX Shop!", reply_markup=keyboard)
