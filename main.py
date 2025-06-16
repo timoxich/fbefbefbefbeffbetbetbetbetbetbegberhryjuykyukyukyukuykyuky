@@ -7,7 +7,7 @@ import aiohttp
 import asyncio
 import os
 
-BOT_TOKEN = os.getenv("BOT_TOKEN") or "7863135976:AAGlQmvWoPPqKtb9kn6WjgiL96AG0a8EFkw"
+BOT_TOKEN = os.getenv("BOT_TOKEN") or "7979522454:AAHbyCLfqwm6KSiiM45weBFXtdCoAkzwCj4"
 API_BASE = "https://elevenx.onrender.com"
 ADMIN_IDS = {7899575088, 5361974069}
 
