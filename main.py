@@ -31,17 +31,27 @@ async def back_button():
     kb.button(text="⬅️ Назад", callback_data="back")
     return kb.as_markup()
 
+async def fetch_json(session, url, method="GET", **kwargs):
+    try:
+        timeout = aiohttp.ClientTimeout(total=10)
+        async with session.request(method, url, timeout=timeout, **kwargs) as resp:
+            if resp.status == 200:
+                try:
+                    return await resp.json()
+                except aiohttp.ContentTypeError:
+                    return None
+            else:
+                return None
+    except Exception:
+        return None
+
 @dp.message(CommandStart(deep_link=True))
 async def activate_command(msg, command: CommandStart):
     code = command.args
     hwid = f"UID_{msg.from_user.id}"
     async with aiohttp.ClientSession() as session:
-        async with session.get(
-            f"{API_BASE}/ZJEfYIMk_activate_key",
-            params={"code": code, "hwid": hwid}
-        ) as resp:
-            res = await resp.json()
-    if res.get("success"):
+        res = await fetch_json(session, f"{API_BASE}/ZJEfYIMk_activate_key", params={"code": code, "hwid": hwid})
+    if res and res.get("success"):
         key = res["key"]
         user_id = msg.from_user.id
         PAID_USERS.add(user_id)
@@ -92,15 +102,10 @@ async def profile(call):
 async def subscription(call):
     user_id = call.from_user.id
     async with aiohttp.ClientSession() as session:
-        async with session.get(
-            f"{API_BASE}/moASnrwD_get_key_info",
-            params={"key": f"UID_{user_id}"}
-        ) as resp:
-            data = await resp.json()
+        data = await fetch_json(session, f"{API_BASE}/moASnrwD_get_key_info", params={"key": f"UID_{user_id}"})
     kb = InlineKeyboardBuilder()
-    if not data.get("found", False):
-        if user_id in PAID_USERS:
-            PAID_USERS.discard(user_id)
+    if not data or not data.get("found", False):
+        PAID_USERS.discard(user_id)
         kb.button(text="🔐 Активировать ключ", callback_data="enter_key")
         kb.button(text="⬅️ Назад", callback_data="back")
         await call.message.edit_text("❌ У вас нет активной подписки. Купить можно у @hexwound", reply_markup=kb.as_markup())
@@ -133,10 +138,9 @@ async def create_key_start(call):
         await call.answer("Доступ запрещён", show_alert=True)
         return
     async with aiohttp.ClientSession() as session:
-        async with session.post(f"{API_BASE}/generate_key") as resp:
-            res = await resp.json()
+        res = await fetch_json(session, f"{API_BASE}/generate_key", method="POST")
     kb = await back_button()
-    if res.get("success") and res.get("key"):
+    if res and res.get("success") and res.get("key"):
         await call.message.edit_text(f"✅ Ключ создан:\n<code>{res['key']}</code>", parse_mode=ParseMode.HTML, reply_markup=kb)
     else:
         await call.message.edit_text("❌ Ошибка при создании ключа.", reply_markup=kb)
@@ -152,12 +156,8 @@ async def handle_key_input(msg):
     key = msg.text.strip()
     hwid = f"UID_{msg.from_user.id}"
     async with aiohttp.ClientSession() as session:
-        async with session.get(
-            f"{API_BASE}/ZJEfYIMk_activate_key",
-            params={"code": key, "hwid": hwid}
-        ) as resp:
-            res = await resp.json()
-    if res.get("success"):
+        res = await fetch_json(session, f"{API_BASE}/ZJEfYIMk_activate_key", params={"code": key, "hwid": hwid})
+    if res and res.get("success"):
         PAID_USERS.add(msg.from_user.id)
         await msg.answer(f"✅ Ключ активирован: <code>{res['key']}</code>", parse_mode=ParseMode.HTML)
     else:
