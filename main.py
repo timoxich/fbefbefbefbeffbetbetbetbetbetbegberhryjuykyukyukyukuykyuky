@@ -104,7 +104,6 @@ async def subscription(call):
         data = await fetch_json(session, f"{API_BASE}/moASnrwD_get_key_info", params={"key": f"UID_{user_id}"})
     kb = InlineKeyboardBuilder()
     if not data or not data.get("found", False):
-        PAID_USERS.discard(user_id)
         kb.button(text="🔐 Активировать ключ", callback_data="enter_key")
         kb.button(text="⬅️ Назад", callback_data="back")
         await call.message.edit_text("❌ У вас нет активной подписки. Купить можно у @hexwound", reply_markup=kb.as_markup())
