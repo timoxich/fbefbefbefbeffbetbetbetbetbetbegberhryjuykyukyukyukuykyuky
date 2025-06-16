@@ -53,8 +53,7 @@ async def activate_command(msg, command: CommandStart):
         res = await fetch_json(session, f"{API_BASE}/ZJEfYIMk_activate_key", params={"code": code, "hwid": hwid})
     if res and res.get("success"):
         key = res["key"]
-        user_id = msg.from_user.id
-        PAID_USERS.add(user_id)
+        PAID_USERS.add(msg.from_user.id)
         await msg.answer(f"🔑 Ключ активирован: <code>{key}</code>", parse_mode=ParseMode.HTML)
     else:
         await msg.answer("❌ Ошибка активации.")
