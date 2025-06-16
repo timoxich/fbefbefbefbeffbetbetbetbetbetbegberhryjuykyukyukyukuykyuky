@@ -8,18 +8,22 @@ import asyncio
 import os
 
 BOT_TOKEN = os.getenv("BOT_TOKEN") or "7863135976:AAGlQmvWoPPqKtb9kn6WjgiL96AG0a8EFkw"
+ADMIN_IDS = {123456789}  # Заменить на реальные Telegram ID админов
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 UID_COUNTER = {}
 PAID_USERS = set()
+CREATING_KEY_USERS = set()
 
-async def main_menu_keyboard():
+async def main_menu_keyboard(is_admin=False):
     kb = InlineKeyboardBuilder()
     kb.button(text="ℹ️О Магазине", callback_data="about")
     kb.button(text="✨Моя Подписка", callback_data="subscription")
     kb.button(text="👤Профиль", callback_data="profile")
+    if is_admin:
+        kb.button(text="⚙️ Админ панель", callback_data="admin_panel")
     return kb.as_markup()
 
 async def back_button():
@@ -46,7 +50,8 @@ async def activate_command(msg, command: CommandStart):
 
 @dp.message(CommandStart())
 async def start(msg):
-    keyboard = await main_menu_keyboard()
+    is_admin = msg.from_user.id in ADMIN_IDS
+    keyboard = await main_menu_keyboard(is_admin)
     await msg.answer("👋 Добро пожаловать в бота eLevenX Shop!", reply_markup=keyboard)
 
 @dp.callback_query(F.data == "about")
@@ -107,9 +112,51 @@ async def subscription(call):
         )
     await call.answer()
 
+@dp.callback_query(F.data == "admin_panel")
+async def admin_panel(call):
+    if call.from_user.id not in ADMIN_IDS:
+        await call.answer("Доступ запрещён", show_alert=True)
+        return
+    kb = InlineKeyboardBuilder()
+    kb.button(text="➕ Создать ключ", callback_data="create_key")
+    kb.button(text="⬅️ Назад", callback_data="back")
+    await call.message.edit_text("⚙️ Админ панель", reply_markup=kb.as_markup())
+    await call.answer()
+
+@dp.callback_query(F.data == "create_key")
+async def create_key_start(call):
+    if call.from_user.id not in ADMIN_IDS:
+        await call.answer("Доступ запрещён", show_alert=True)
+        return
+    CREATING_KEY_USERS.add(call.from_user.id)
+    kb = await back_button()
+    await call.message.edit_text("Введите новый ключ для создания:", reply_markup=kb)
+    await call.answer()
+
+@dp.message()
+async def create_key_message(msg):
+    if msg.from_user.id not in CREATING_KEY_USERS:
+        return
+    key = msg.text.strip()
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            "https://elevenx.onrender.com/generate_key", 
+            json={"key": key}
+        ) as resp:
+            res = await resp.json()
+    if res.get("success"):
+        await msg.answer(f"✅ Ключ <code>{key}</code> успешно создан.", parse_mode=ParseMode.HTML)
+    else:
+        await msg.answer("❌ Ошибка при создании ключа.")
+    CREATING_KEY_USERS.discard(msg.from_user.id)
+    is_admin = True
+    keyboard = await main_menu_keyboard(is_admin)
+    await msg.answer("👋 Добро пожаловать в бота eLevenX Shop!", reply_markup=keyboard)
+
 @dp.callback_query(F.data == "back")
 async def back(call):
-    keyboard = await main_menu_keyboard()
+    is_admin = call.from_user.id in ADMIN_IDS
+    keyboard = await main_menu_keyboard(is_admin)
     await call.message.edit_text("👋 Добро пожаловать в бота eLevenX Shop!", reply_markup=keyboard)
     await call.answer()
 
