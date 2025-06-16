@@ -1,13 +1,9 @@
 import sqlite3
 import random
 import string
-import asyncio
+import subprocess
 from fastapi import FastAPI, Query
 from pydantic import BaseModel
-import uvicorn
-
-
-import main 
 
 app = FastAPI()
 DB_PATH = "db.sqlite"
@@ -65,8 +61,8 @@ def generate_key():
 class KeyModel(BaseModel):
     key: str
 
-@app.get("/check")
-def check(key: str = Query(...), hwid: str = Query(...)):
+@app.get("/TKVYLeXu_check")
+def check(key: str, hwid: str = Query(...)):
     result = get_key_data(key)
     if not result:
         return {"valid": False}
@@ -77,23 +73,30 @@ def check(key: str = Query(...), hwid: str = Query(...)):
         if not stored_hwid:
             update_hwid(key, hwid)
         return {"valid": True}
-    return {"valid": False}
+    else:
+        return {"valid": False}
 
-@app.post("/reset_hwid")
+@app.post("/MmsTdaqL_reset_hwid")
 def reset(data: KeyModel):
     if not get_key_data(data.key):
         return {"success": False}
     reset_key_hwid(data.key)
     return {"success": True}
 
-@app.get("/activate_key")
-def activate(code: str = Query(...)):
+@app.get("/generate_key")
+def generate_key_endpoint():
     key = generate_key()
     insert_key(key)
     return {"success": True, "key": key}
 
-@app.get("/get_key_info")
-def info(key: str = Query(...)):
+@app.get("/ZJEfYIMk_activate_key")
+def activate(code: str = None):
+    key = generate_key()
+    insert_key(key)
+    return {"success": True, "key": key}
+
+@app.get("/moASnrwD_get_key_info")
+def info(key: str):
     result = get_key_data(key)
     if not result:
         return {"found": False}
@@ -106,11 +109,7 @@ def info(key: str = Query(...)):
         "dlc_status": "UNDETECTED"
     }
 
-
-@app.on_event("startup")
-async def launch_bot():
-    asyncio.create_task(main.main())  
-
-
 if __name__ == "__main__":
+    subprocess.Popen(["python3", "main.py"])  # запускаем Telegram-бота
+    import uvicorn
     uvicorn.run("server_fastapi:app", host="0.0.0.0", port=8000)
