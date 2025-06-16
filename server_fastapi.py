@@ -56,7 +56,7 @@ def insert_key(key):
     conn.close()
 
 def generate_key():
-    return "NEREST_" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    return "ELEVENX_" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
 
 class KeyModel(BaseModel):
     key: str
