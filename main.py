@@ -45,13 +45,6 @@ async def fetch_json(session, url, method="GET", **kwargs):
     except Exception:
         return None
 
-async def check_subscription(user_id: int) -> bool:
-    async with aiohttp.ClientSession() as session:
-        data = await fetch_json(session, f"{API_BASE}/moASnrwD_get_key_info", params={"key": f"UID_{user_id}"})
-        if data and data.get("found", False):
-            return True
-        return False
-
 @dp.message(CommandStart(deep_link=True))
 async def activate_command(msg, command: CommandStart):
     code = command.args
@@ -92,8 +85,7 @@ async def profile(call):
     if uid is None:
         uid = len(UID_COUNTER) + 1
         UID_COUNTER[call.from_user.id] = uid
-    is_paid = await check_subscription(call.from_user.id)
-    status = "Платный подписчик" if is_paid else "Без подписки"
+    status = "Платный подписчик" if call.from_user.id in PAID_USERS else "Без подписки"
     kb = await back_button()
     await call.message.edit_text(
         f"✨ Ваш профиль\n\n"
@@ -112,10 +104,12 @@ async def subscription(call):
         data = await fetch_json(session, f"{API_BASE}/moASnrwD_get_key_info", params={"key": f"UID_{user_id}"})
     kb = InlineKeyboardBuilder()
     if not data or not data.get("found", False):
+        PAID_USERS.discard(user_id)
         kb.button(text="🔐 Активировать ключ", callback_data="enter_key")
         kb.button(text="⬅️ Назад", callback_data="back")
         await call.message.edit_text("❌ У вас нет активной подписки. Купить можно у @hexwound", reply_markup=kb.as_markup())
     else:
+        PAID_USERS.add(user_id)
         kb.button(text="⬅️ Назад", callback_data="back")
         await call.message.edit_text(
             f"🔑 Ключ: {data['key']}\n"
