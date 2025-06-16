@@ -1,20 +1,18 @@
+import os
+import asyncio
+import aiohttp
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
+from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.enums import ParseMode
-import aiohttp
-import asyncio
-import os
 
 BOT_TOKEN = os.getenv("BOT_TOKEN") or "7863135976:AAGlQmvWoPPqKtb9kn6WjgiL96AG0a8EFkw"
+API_BASE = "https://elevenx.onrender.com"
+
 ADMIN_IDS = {7899575088, 5361974069}
-
-API_BASE = "http://elevenx.onrender.com" 
-
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
-
 UID_COUNTER = {}
 PAID_USERS = set()
 
@@ -130,7 +128,7 @@ async def create_key_start(call):
         await call.answer("Доступ запрещён", show_alert=True)
         return
     async with aiohttp.ClientSession() as session:
-        async with session.post(f"{API_BASE}/ZJEfYIMk_activate_key") as resp:
+        async with session.get(f"{API_BASE}/generate_key") as resp:
             res = await resp.json()
     kb = await back_button()
     if res.get("success") and res.get("key"):
