@@ -13,7 +13,7 @@ UID_COUNTER = {}
 async def activate_command(msg: types.Message, command: CommandStart):
     code = command.args
     async with aiohttp.ClientSession() as session:
-        async with session.get("http://localhost:8000/ZJEfYIMk_activate_key", params={"code": code}) as r:
+        async with session.get("http://elevenx.onrender.com/ZJEfYIMk_activate_key", params={"code": code}) as r:
             res = await r.json()
     if res.get("success"):
         key = res["key"]
@@ -60,7 +60,7 @@ async def profile(call: types.CallbackQuery):
 async def subscription(call: types.CallbackQuery):
     user_id = call.from_user.id
     async with aiohttp.ClientSession() as session:
-        async with session.get("http://localhost:8000/moASnrwD_get_key_info", params={"key": f"UID_{user_id}"}) as r:
+        async with session.get("https://elevenx.onrender.com//moASnrwD_get_key_info", params={"key": f"UID_{user_id}"}) as r:
             data = await r.json()
     if not data["found"]:
         await call.message.edit_text("❌ У вас нет активной подписки. Купить можно у @hexwound")
