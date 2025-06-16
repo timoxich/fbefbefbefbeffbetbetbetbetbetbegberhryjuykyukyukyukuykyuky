@@ -24,7 +24,7 @@ def init_db():
 init_db()
 
 def get_conn():
-    return sqlite3.connect(DB_PATH)
+    return sqlite3.connect(DB_PATH, check_same_thread=False)
 
 def get_key_data(key: str):
     with get_conn() as conn:
@@ -56,7 +56,7 @@ def generate_key():
 class KeyModel(BaseModel):
     key: str
 
-@app.get("/TKVYLeXu_check")
+@app.get("/check")
 def check(key: str = Query(...), hwid: str = Query(...)):
     result = get_key_data(key)
     if not result:
@@ -70,20 +70,20 @@ def check(key: str = Query(...), hwid: str = Query(...)):
         return {"valid": True}
     return {"valid": False}
 
-@app.post("/MmsTdaqL_reset_hwid")
+@app.post("/reset_hwid")
 def reset(data: KeyModel):
     if not get_key_data(data.key):
         return {"success": False}
     reset_key_hwid(data.key)
     return {"success": True}
 
-@app.api_route("/generate_key", methods=["GET", "POST"])
+@app.post("/generate_key")
 def generate_key_endpoint():
     key = generate_key()
     insert_key(key)
     return {"success": True, "key": key}
 
-@app.get("/ZJEfYIMk_activate_key")
+@app.get("/activate_key")
 def activate_key(code: str = Query(...), hwid: str = Query(...)):
     result = get_key_data(code)
     if not result:
@@ -97,7 +97,7 @@ def activate_key(code: str = Query(...), hwid: str = Query(...)):
         update_hwid(code, hwid)
     return {"success": True, "key": code}
 
-@app.get("/moASnrwD_get_key_info")
+@app.get("/get_key_info")
 def info(key: str = Query(...)):
     result = get_key_data(key)
     if not result:
@@ -112,12 +112,11 @@ def info(key: str = Query(...)):
     }
 
 def run_bot():
-    subprocess.run(["python3", "main.py"])
+    subprocess.run(["python", "main.py"])
 
 if __name__ == "__main__":
     bot_thread = Thread(target=run_bot, daemon=True)
     bot_thread.start()
 
     import uvicorn
-
-    uvicorn.run("server_fastapi:app", host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
