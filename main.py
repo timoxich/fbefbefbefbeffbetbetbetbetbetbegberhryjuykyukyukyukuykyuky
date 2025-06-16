@@ -1,20 +1,28 @@
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.enums import ParseMode
+from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
-from aiogram.types import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.enums import ParseMode
 import aiohttp
 import asyncio
+import os
 
-bot = Bot("7863135976:AAGlQmvWoPPqKtb9kn6WjgiL96AG0a8EFkw") 
+BOT_TOKEN = os.getenv("BOT_TOKEN") or "7863135976:AAGlQmvWoPPqKtb9kn6WjgiL96AG0a8EFkw"
+
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
+
 UID_COUNTER = {}
 
 @dp.message(CommandStart(deep_link=True))
-async def activate_command(msg: types.Message, command: CommandStart):
+async def activate_command(msg, command: CommandStart):
     code = command.args
     async with aiohttp.ClientSession() as session:
-        async with session.get("http://elevenx.onrender.com/ZJEfYIMk_activate_key", params={"code": code}) as r:
-            res = await r.json()
+        async with session.get(
+            "http://elevenx.onrender.com/ZJEfYIMk_activate_key",
+            params={"code": code}
+        ) as resp:
+            res = await resp.json()
     if res.get("success"):
         key = res["key"]
         await msg.answer(f"🔑 Ключ выдан: <code>{key}</code>", parse_mode=ParseMode.HTML)
@@ -22,7 +30,7 @@ async def activate_command(msg: types.Message, command: CommandStart):
         await msg.answer("❌ Ошибка активации.")
 
 @dp.message(CommandStart())
-async def start(msg: types.Message):
+async def start(msg):
     kb = InlineKeyboardBuilder()
     kb.button(text="ℹ️О Магазине", callback_data="about")
     kb.button(text="✨Моя Подписка", callback_data="subscription")
@@ -31,7 +39,7 @@ async def start(msg: types.Message):
     await msg.answer("Выберите действие...")
 
 @dp.callback_query(F.data == "about")
-async def about(call: types.CallbackQuery):
+async def about(call):
     await call.message.edit_text(
         "✨ О магазине\n\n"
         "eLevenX – Уникальное DLC для Standoff 2\n"
@@ -41,9 +49,10 @@ async def about(call: types.CallbackQuery):
         "Важно! Для использования DLC необходимы рут-права!\n\n"
         "💎 Наш Telegram канал: https://t.me/elevenx8"
     )
+    await call.answer()  # чтобы убрать "часики" у кнопки
 
 @dp.callback_query(F.data == "profile")
-async def profile(call: types.CallbackQuery):
+async def profile(call):
     uid = UID_COUNTER.get(call.from_user.id)
     if uid is None:
         uid = len(UID_COUNTER) + 1
@@ -55,14 +64,18 @@ async def profile(call: types.CallbackQuery):
         f"UID в боте: {uid}\n"
         f"Статус в боте: {'Платный подписчик' if call.from_user.id in UID_COUNTER else 'Без подписки'}"
     )
+    await call.answer()
 
 @dp.callback_query(F.data == "subscription")
-async def subscription(call: types.CallbackQuery):
+async def subscription(call):
     user_id = call.from_user.id
     async with aiohttp.ClientSession() as session:
-        async with session.get("https://elevenx.onrender.com//moASnrwD_get_key_info", params={"key": f"UID_{user_id}"}) as r:
-            data = await r.json()
-    if not data["found"]:
+        async with session.get(
+            "https://elevenx.onrender.com//moASnrwD_get_key_info",
+            params={"key": f"UID_{user_id}"}
+        ) as resp:
+            data = await resp.json()
+    if not data.get("found", False):
         await call.message.edit_text("❌ У вас нет активной подписки. Купить можно у @hexwound")
     else:
         await call.message.edit_text(
@@ -71,9 +84,14 @@ async def subscription(call: types.CallbackQuery):
             f"🛡️ Статус DLC: {data['dlc_status']}\n\n"
             f"ℹ️ Получить DLC и все необходимые файлы можно у @hexwound"
         )
+    await call.answer()
 
 async def main():
-    await dp.start_polling(bot)
+    print("Бот запускается...")
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await bot.session.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
