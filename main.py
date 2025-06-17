@@ -15,7 +15,7 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 UID_COUNTER = {}
-PAID_USERS = set()
+PAID_USERS = {}
 
 async def main_menu_keyboard(is_admin=False):
     kb = InlineKeyboardBuilder()
@@ -50,13 +50,12 @@ async def fetch_json(session, url, method="GET", **kwargs):
 @dp.message(CommandStart(deep_link=True))
 async def activate_command(msg: Message, command: CommandStart):
     code = command.args
-    hwid = f"UID_{msg.from_user.id}"
+    user_id = msg.from_user.id
     async with aiohttp.ClientSession() as session:
-        res = await fetch_json(session, f"{API_BASE}/activate_key", params={"code": code, "hwid": hwid})
+        res = await fetch_json(session, f"{API_BASE}/activate_key/", params={"key": code, "user_id": user_id})
     if res and res.get("success"):
-        key = res["key"]
-        PAID_USERS.add(msg.from_user.id)
-        await msg.answer(f"🔑 Ключ активирован: <code>{key}</code>", parse_mode=ParseMode.HTML)
+        PAID_USERS[user_id] = code
+        await msg.answer(f"🔑 Ключ активирован: <code>{code}</code>", parse_mode=ParseMode.HTML)
     else:
         await msg.answer("❌ Ошибка активации.")
 
@@ -103,21 +102,21 @@ async def profile(call: CallbackQuery):
 async def subscription(call: CallbackQuery):
     user_id = call.from_user.id
     async with aiohttp.ClientSession() as session:
-        data = await fetch_json(session, f"{API_BASE}/get_key_info", params={"key": f"UID_{user_id}"})
+        data = await fetch_json(session, f"{API_BASE}/check_key/", params={"user_id": user_id})
     kb = InlineKeyboardBuilder()
-    if not data or not data.get("found", False):
-        PAID_USERS.discard(user_id)
+    if not data or not data.get("valid", False):
+        PAID_USERS.pop(user_id, None)
         kb.button(text="🔐 Активировать ключ", callback_data="enter_key")
         kb.button(text="⬅️ Назад", callback_data="back")
         kb.adjust(1)
         await call.message.edit_text("❌ У вас нет активной подписки. Купить можно у @hexwound", reply_markup=kb.as_markup())
     else:
-        PAID_USERS.add(user_id)
+        key = data.get("key")
+        PAID_USERS[user_id] = key
         kb.button(text="⬅️ Назад", callback_data="back")
         await call.message.edit_text(
-            f"🔑 Ключ: {data['key']}\n"
-            f"📱 Устройство: {data['hwid']}\n"
-            f"🛡️ Статус DLC: {data['dlc_status']}\n\n"
+            f"🔑 Ключ: {key}\n"
+            f"🛡️ Статус DLC: UNDETECTED\n\n"
             f"ℹ️ Получить DLC и все необходимые файлы можно у @hexwound",
             reply_markup=kb.as_markup()
         )
@@ -141,9 +140,9 @@ async def create_key_start(call: CallbackQuery):
         await call.answer("Доступ запрещён", show_alert=True)
         return
     async with aiohttp.ClientSession() as session:
-        res = await fetch_json(session, f"{API_BASE}/generate_key", method="POST")
+        res = await fetch_json(session, f"{API_BASE}/generate_key/", method="POST")
     kb = await back_button()
-    if res and res.get("success") and res.get("key"):
+    if res and res.get("key"):
         await call.message.edit_text(f"✅ Ключ создан:\n<code>{res['key']}</code>", parse_mode=ParseMode.HTML, reply_markup=kb)
     else:
         await call.message.edit_text("❌ Ошибка при создании ключа.", reply_markup=kb)
@@ -157,12 +156,12 @@ async def enter_key_start(call: CallbackQuery):
 @dp.message(F.text)
 async def handle_key_input(msg: Message):
     key = msg.text.strip()
-    hwid = f"UID_{msg.from_user.id}"
+    user_id = msg.from_user.id
     async with aiohttp.ClientSession() as session:
-        res = await fetch_json(session, f"{API_BASE}/activate_key", params={"code": key, "hwid": hwid})
+        res = await fetch_json(session, f"{API_BASE}/activate_key/", params={"key": key, "user_id": user_id})
     if res and res.get("success"):
-        PAID_USERS.add(msg.from_user.id)
-        await msg.answer(f"✅ Ключ активирован: <code>{res['key']}</code>", parse_mode=ParseMode.HTML)
+        PAID_USERS[user_id] = key
+        await msg.answer(f"✅ Ключ активирован: <code>{key}</code>", parse_mode=ParseMode.HTML)
     else:
         await msg.answer("❌ Неверный ключ или ошибка активации.")
 
